@@ -5,6 +5,7 @@ import (
 	"context"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 )
 
@@ -14,7 +15,7 @@ type Select struct {
 	TotalItem         int
 	Data              interface{}
 	FilterFields      []string
-	FilterFieldsValue []string
+	FilterFieldsValue []interface{}
 }
 
 func (sl *Select) Get() []map[string]interface{} {
@@ -22,7 +23,11 @@ func (sl *Select) Get() []map[string]interface{} {
 	for i, field := range sl.FilterFields {
 		filter[field] = sl.FilterFieldsValue[i]
 	}
-	cursor, err := sl.Connection.Collection(sl.Collection).Find(context.Background(), filter)
+	findOptions := options.Find()
+	if sl.TotalItem != -1 {
+		findOptions.SetLimit(int64(sl.TotalItem))
+	}
+	cursor, err := sl.Connection.Collection(sl.Collection).Find(context.Background(), filter, findOptions)
 	if err != nil {
 		logger.LogError(logger.LogErrorStruct{Message: err.Error()})
 	}
