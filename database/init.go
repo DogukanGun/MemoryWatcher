@@ -2,39 +2,39 @@ package database
 
 import (
 	"MemoryWatcher/logger"
-	"bufio"
 	"bytes"
+	"context"
 	"fmt"
-	"net/http"
-	"os"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"os/exec"
 	"runtime"
-	"strings"
+	"time"
 )
 
 func Install() {
 	// Check if CouchDB is installed
-	if !isCouchDBInstalled() {
-		err := installCouchDB()
+	if !isMongoDBInstalled() {
+		err := installMongoDB()
 		if err != nil {
-			logger.LogError(logger.LogErrorStruct{Message: fmt.Sprintf("Error installing CouchDB: %v", err)})
+			logger.LogError(logger.LogErrorStruct{Message: fmt.Sprintf("Error installing MongoDB: %v", err)})
 		} else {
-			fmt.Println("CouchDB installed successfully.")
+			fmt.Println("Mongo DB installed successfully.")
 		}
 	} else {
-		fmt.Println("CouchDB is already installed.")
-		startCouchDB()
+		fmt.Println("Mongo DB is already installed.")
+		startMongoDB()
 	}
 }
 
-func isCouchDBInstalled() bool {
+func isMongoDBInstalled() bool {
 	// Check if the command exists
-	cmd := exec.Command("command", "-v", "couchdb")
+	cmd := exec.Command("command", "-v", "mongod")
 	err := cmd.Run()
 	return err == nil
 }
 
-func installCouchDB() error {
+func installMongoDB() error {
 	// Install CouchDB (commands may vary depending on the OS)
 	switch runtime.GOOS {
 	case "linux":
@@ -46,11 +46,11 @@ func installCouchDB() error {
 	}
 }
 
-func startCouchDB() {
+func startMongoDB() {
 	// Start CouchDB (commands may vary depending on the OS)
 	switch runtime.GOOS {
 	case "linux":
-		installForLinux()
+		startDbForLinux()
 	case "darwin":
 		startDbForMac()
 	default:
@@ -59,7 +59,7 @@ func startCouchDB() {
 }
 
 func installForMac() error {
-	cmd := exec.Command("brew", "install", "couchdb")
+	cmd := exec.Command("brew", "install", "mongodb")
 	var out bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &out
@@ -79,13 +79,7 @@ func installForLinux() error {
 	if err != nil {
 		return err
 	}
-	cmd = exec.Command("sudo", "apt-get", "install", "-y", "couchdb")
-	err = cmd.Run()
-	if err != nil {
-		return err
-	}
-	// Start CouchDB service
-	cmd = exec.Command("sudo", "systemctl", "start", "couchdb")
+	cmd = exec.Command("sudo", "apt-get", "install", "-y", "mongodb")
 	err = cmd.Run()
 	if err != nil {
 		return err
@@ -95,90 +89,59 @@ func installForLinux() error {
 
 // starts couch db for mac
 func startDbForMac() {
-	if !isDbHasPasswordForMac() {
-		cmdSetPassword := exec.Command("bash", "-c", "echo '[admins]\nadmin = memorywatcher' >> /opt/homebrew/etc/local.ini")
-		if err := cmdSetPassword.Run(); err != nil {
-			fmt.Println("Error setting admin password:", err)
-			return
-		}
-	}
-	if !isDbWorking() {
-		// Start CouchDB using brew services
-		cmdStart := exec.Command("brew", "services", "start", "couchdb")
+	if !isMongoDBWorking() {
+		// Start Mongo DB using brew services
+		cmdStart := exec.Command("brew", "services", "start", "mongodb-community")
 		if err := cmdStart.Run(); err != nil {
-			fmt.Println("Error starting CouchDB:", err)
+			fmt.Println("Error starting Mongo DB:", err)
 			return
 		}
-		fmt.Println("CouchDB started successfully.")
+		fmt.Println("Mongo DB started successfully.")
 	}
 
 }
 
-func isDbWorking() bool {
-	couchDBURL := "http://localhost:5984"
-
-	// Send a GET request to the CouchDB server
-	resp, err := http.Get(couchDBURL)
-	if err != nil {
-		fmt.Printf("Error connecting to CouchDB: %v\n", err)
-		return false
+// starts couch db for linux
+func startDbForLinux() {
+	if !isMongoDBWorking() {
+		// Start Mongo DB using brew services
+		cmdStart := exec.Command("sudo", "systemctl", "start", "mongodb")
+		if err := cmdStart.Run(); err != nil {
+			fmt.Println("Error starting Mongo DB:", err)
+			return
+		}
+		fmt.Println("Mongo DB started successfully.")
 	}
-	defer resp.Body.Close()
 
-	// Check the response status code
-	if resp.StatusCode == http.StatusOK {
-		fmt.Println("CouchDB is working!")
-		return true
-	} else {
-		fmt.Printf("CouchDB is not working, status code: %d\n", resp.StatusCode)
-		return false
-	}
 }
 
-// checks if the couch db has credentials
-func isDbHasPasswordForMac() (foundAdminLine bool) {
-	// Open the file
-	file, err := os.Open("/opt/homebrew/etc/local.ini")
+func isMongoDBWorking() bool {
+	mongoDBURL := "mongodb://localhost:27017"
+
+	// Create a MongoDB client
+	client, err := mongo.NewClient(options.Client().ApplyURI(mongoDBURL))
 	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return
-	}
-	defer file.Close()
-
-	// Create a scanner to read the file line by line
-	scanner := bufio.NewScanner(file)
-
-	// Variables to track if we are in the [admins] section and if we found the admin line
-	inAdminsSection := false
-	foundAdminLine = false
-
-	// Read the file line by line
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Check if the line contains [admins]
-		if strings.Contains(line, "[admins]") {
-			inAdminsSection = true
-			fmt.Println(line)
-		}
-
-		// Check if we are in the [admins] section and if the line contains "admin = memorywatcher"
-		if inAdminsSection && strings.Contains(line, "admin = memorywatcher") {
-			foundAdminLine = true
-			fmt.Println(line)
-		}
-
-		// Break the loop if we found the admin line
-		if foundAdminLine {
-			break
-		}
+		fmt.Printf("Error creating MongoDB client: %v\n", err)
+		return false
 	}
 
-	// Check for errors during scanning
-	if err := scanner.Err(); err != nil {
-		fmt.Println("Error reading file:", err)
-		return
+	// Connect to MongoDB
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	err = client.Connect(ctx)
+	if err != nil {
+		fmt.Printf("Error connecting to MongoDB: %v\n", err)
+		return false
+	}
+	defer client.Disconnect(ctx)
+
+	// Ping MongoDB server
+	err = client.Ping(ctx, nil)
+	if err != nil {
+		fmt.Printf("Error pinging MongoDB server: %v\n", err)
+		return false
 	}
 
-	return
+	fmt.Println("MongoDB is working!")
+	return true
 }

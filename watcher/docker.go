@@ -47,10 +47,33 @@ func WatchDockerContainers() {
 				var operationSummary string
 				if event.Op&fsnotify.Create == fsnotify.Create {
 					operationSummary = fmt.Sprintf("File created: %s", event.Name)
+					fi, err := os.Stat(event.Name)
+					if err != nil {
+						log.Println("Error getting file info:", err)
+					} else {
+						log.Println("File modified:", event.Name)
+						log.Println("File size:", fi.Size(), "bytes")
+					}
 				} else if event.Op&fsnotify.Chmod == fsnotify.Chmod {
 					operationSummary = fmt.Sprintf("File permission changed: %s", event.Name)
 				} else if event.Op&fsnotify.Remove == fsnotify.Remove {
+					fi, err := os.Stat(event.Name)
+					if err != nil {
+						log.Println("Error getting file info:", err)
+					} else {
+						log.Println("File modified:", event.Name)
+						log.Println("File size:", fi.Size(), "bytes")
+					}
 					operationSummary = fmt.Sprintf("File removed: %s", event.Name)
+				} else if event.Op&fsnotify.Write == fsnotify.Write {
+					operationSummary = fmt.Sprintf("File changed: %s", event.Name)
+					fi, err := os.Stat(event.Name)
+					if err != nil {
+						log.Println("Error getting file info:", err)
+					} else {
+						log.Println("File modified:", event.Name)
+						log.Println("File size:", fi.Size(), "bytes")
+					}
 				}
 				logger.LogInfo(logger.LogInfoStruct{Message: "Time: " + currentTime + "\nUser: " + currentUser.Username + "\nOperation " + operationSummary})
 				/*err := sendEmail("File Created", )
