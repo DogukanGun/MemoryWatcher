@@ -1,21 +1,28 @@
 package utils
 
-import "net/smtp"
+import (
+	"log"
+	"net/smtp"
+	"os"
+)
 
-// Function to send email notification
-func sendEmail(subject, body string) error {
-	from := "your-email@example.com"
-	password := "your-email-password"
-	to := "your-email@example.com"
+func Send(body string) {
+	from := "freelance.dogukang@gmail.com"
+	pass := os.Getenv("EMAIL_PASSWORD")
+	to := "dogukangundogan5@gmail.com"
 
 	msg := "From: " + from + "\n" +
 		"To: " + to + "\n" +
-		"Subject: " + subject + "\n\n" +
+		"Subject: Hello there\n\n" +
 		body
 
-	err := smtp.SendMail("smtp.example.com:587",
-		smtp.PlainAuth("", from, password, "smtp.example.com"),
+	err := smtp.SendMail("smtp.gmail.com:587",
+		smtp.PlainAuth("", from, pass, "smtp.gmail.com"),
 		from, []string{to}, []byte(msg))
 
-	return err
+	if err != nil {
+		log.Printf("smtp error: %s", err)
+		return
+	}
+	log.Println("Successfully sended to " + to)
 }

@@ -2,6 +2,7 @@ package watcher
 
 import (
 	"MemoryWatcher/logger"
+	"MemoryWatcher/utils"
 	"context"
 	"fmt"
 	"github.com/docker/docker/api/types"
@@ -76,10 +77,9 @@ func WatchDockerContainers() {
 					}
 				}
 				logger.LogInfo(logger.LogInfoStruct{Message: "Time: " + currentTime + "\nUser: " + currentUser.Username + "\nOperation " + operationSummary})
-				/*err := sendEmail("File Created", )
 				if err != nil {
 					log.Println("Error sending email:", err)
-				}*/
+				}
 			case err := <-watcher.Errors:
 				log.Println("Error watching files:", err)
 			}
@@ -112,6 +112,7 @@ func WatchDockerContainers() {
 					if err != nil {
 						log.Println("Error sending email:", err)
 					}*/
+					utils.Send("Container Created" + " \nTime: " + currentTime + "\nUser: " + currentUser.Username + "\nA new Docker container was created: " + event.ID)
 				}
 			case eventErr := <-dockerErr:
 				fmt.Printf("error from docker client: %s", eventErr)
